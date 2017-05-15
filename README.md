@@ -10,6 +10,9 @@ Scans your disk for video files
 Tells you their names and resolutions
 
 
+
+
+
 What it should do pretty soon:
 
 Use sqlite to store that and call it back
