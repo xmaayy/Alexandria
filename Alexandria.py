@@ -5,6 +5,7 @@ import os
 import logging
 import string
 import re
+import sys
 
 ## CONFIGURING DEBUG INFO LOGGING ##
 logger = logging.getLogger('Alexandria')
@@ -56,21 +57,50 @@ def get_drive_names():
     return drive;
 #****** END OF GET_DRIVE_NAMES *******
 
-def walk_dir(drive):
+def walk_dir(drive,db_cursor):
     ext = [".3g2", ".3gp", ".asf", ".asx", ".avi", ".flv", \
                         ".m2ts", ".mkv", ".mov", ".mp4", ".mpg", ".mpeg", \
                         ".rm", ".swf", ".vob", ".wmv"]
     for root, dirs, files in os.walk(drive.letter):
         for name in files:
-            if name.endswith(tuple(ext)):
-                res= get_file_res(os.path.join(root, name))
-                print(name + " Res: " + res[1] + 'p')
-    
+            if name.endswith(tuple(ext)) and root.find('$Recycle')==-1:
+                try:
+                    res = get_file_res(os.path.join(root, name))
+                    logger.debug(name + " Res: " + res[1] + 'p')
+                    logger.debug("INSERT INTO " + drive.name + " VALUES ('" + name + "'," + str(res[1]) + "," + '0' + "," + '0' + ")")
+                    db_cursor.execute('INSERT INTO "' + drive.name + '" VALUES ("' + name + '",' + str(res[1]) + ',' + '0' + ',' + '0' + ')')
+                except Exception as error:
+                    logger.info('Bad File: '+os.path.join(root, name))
 
-
-print('You have the following hard disks: ')
+###############################################################################################################
 drives = get_drive_names()
-for drive in drives:
-    print(drive.letter + ' ' + drive.name + ' ' + str(drive.serial))
 
-walk_dir(drives[1])
+while 1:
+    #See if they really do want each disk to be scanned
+    print('\n\nYou have the following drives to be scanned: ')
+    for drive_num in range(len(drives)):
+        print(str(drive_num+1) + " " + drives[drive_num].letter + ' ' + drives[drive_num].name + ' ' + str(drives[drive_num].serial))
+
+    exclude = input('Would you like to exclude any of these drives? If so, please enter its number now, or 0 to continue: ')
+    if int(exclude,10):
+        try:
+            drives.pop(int(exclude,10)-1)
+        except KeyError:
+            print('Please input a number')
+    else:
+        break
+        
+
+for drive in drives:
+    connection = sqlite3.connect('Library.db')
+    db_cursor = connection.cursor()
+    try:
+        db_cursor.execute("CREATE TABLE '" + drive.name + "' (name, resolution, size, age)")
+        print ("Created Drive Table")
+    except sqlite3.Error as er:
+        print (er)
+    print("Cataloging disk " + drive.letter + " otherwise known as: " + drive.name)
+    walk_dir(drive,db_cursor)
+    connection.commit()
+
+db_cursor.close()
