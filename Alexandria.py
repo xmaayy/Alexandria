@@ -72,35 +72,84 @@ def walk_dir(drive,db_cursor):
                 except Exception as error:
                     logger.info('Bad File: '+os.path.join(root, name))
 
-###############################################################################################################
-drives = get_drive_names()
+def scan():
+    drives = get_drive_names()
 
-while 1:
-    #See if they really do want each disk to be scanned
-    print('\n\nYou have the following drives to be scanned: ')
-    for drive_num in range(len(drives)):
-        print(str(drive_num+1) + " " + drives[drive_num].letter + ' ' + drives[drive_num].name + ' ' + str(drives[drive_num].serial))
+    while 1:
+        #See if they really do want each disk to be scanned
+        print('\n\nYou have the following drives to be scanned: ')
+        for drive_num in range(len(drives)):
+            print(str(drive_num+1) + " " + drives[drive_num].letter + ' ' + drives[drive_num].name + ' ' + str(drives[drive_num].serial))
 
-    exclude = input('Would you like to exclude any of these drives? If so, please enter its number now, or 0 to continue: ')
-    if int(exclude,10):
+        exclude = input('Would you like to exclude any of these drives? If so, please enter its number now, or 0 to continue: ')
+        if int(exclude,10):
+            try:
+                drives.pop(int(exclude,10)-1)
+            except KeyError:
+                print('Please input a number')
+        else:
+            break
+            
+
+    for drive in drives:
+        connection = sqlite3.connect('Library.db')
+        db_cursor = connection.cursor()
+        db_cursor.execute("DROP TABLE IF EXISTS '"+drive.name+"'")
+        connection.commit()
         try:
-            drives.pop(int(exclude,10)-1)
-        except KeyError:
-            print('Please input a number')
-    else:
-        break
-        
+            db_cursor.execute("CREATE TABLE '" + drive.name + "' (name, resolution, size, age)")
+            print ("Re/Created Drive Table")
+        except sqlite3.Error as er:
+            print (er)
+        print("Cataloging disk " + drive.letter + " otherwise known as: " + drive.name)
+        walk_dir(drive,db_cursor)
+        connection.commit()
 
-for drive in drives:
+    db_cursor.close()
+
+def search():
+    drives = get_drive_names()
     connection = sqlite3.connect('Library.db')
     db_cursor = connection.cursor()
-    try:
-        db_cursor.execute("CREATE TABLE '" + drive.name + "' (name, resolution, size, age)")
-        print ("Created Drive Table")
-    except sqlite3.Error as er:
-        print (er)
-    print("Cataloging disk " + drive.letter + " otherwise known as: " + drive.name)
-    walk_dir(drive,db_cursor)
-    connection.commit()
 
-db_cursor.close()
+    term = input ("What would you like to search for? :   ")
+
+    for drive in drives:
+        try:
+            for file in db_cursor.execute("SELECT * from '" + drive.name + "' WHERE name LIKE '%" + term + "%'"):
+                print ("Name: " + file[0] + "\t\tResolution: " + str(file[1]) + 'p')
+        except sqlite3.Error as er:
+            print(er)
+    
+
+###############################################################################################################
+
+print("Welcome to Alexandria! Version 0.01")
+
+while 1:
+    
+    try:
+        if(int(input("What would you like to do? 0-Scan   1-Search   :   "))):
+            search()
+        else:
+            scan()
+    except KeyError:
+        print("That aint no number")
+
+scan()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
